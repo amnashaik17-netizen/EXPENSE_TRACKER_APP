@@ -1,0 +1,282 @@
+/* ============================= */
+/* GOOGLE FONT */
+/* ============================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* ============================= */
+/* MAIN APP */
+/* ============================= */
+
+html, body, [class*="css"] {
+
+    font-family: 'Poppins', sans-serif;
+}
+
+/* ============================= */
+/* BACKGROUND */
+/* ============================= */
+
+.stApp {
+
+    background: linear-gradient(
+        135deg,
+        #f5ddb2,
+        #f1eeb8,
+        #dddccc
+    );
+
+    color: rgb(8, 8, 8);
+}
+
+/* ============================= */
+/* SIDEBAR */
+/* ============================= */
+
+section[data-testid="stSidebar"] {
+
+    background: rgba(255, 255, 255, 0.08);
+
+    backdrop-filter: blur(20px);
+
+    border-right: 1px solid rgba(255,255,255,0.1);
+
+    box-shadow: 0px 8px 32px rgba(0,0,0,0.3);
+}
+
+/* ============================= */
+/* METRIC CARDS */
+/* ============================= */
+
+div[data-testid="metric-container"] {
+
+    background: rgba(255,255,255,0.08);
+
+    border: 1px solid rgba(255,255,255,0.1);
+
+    padding: 20px;
+
+    border-radius: 20px;
+
+    backdrop-filter: blur(15px);
+
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+
+    transition: 0.3s;
+}
+
+div[data-testid="metric-container"]:hover {
+
+    transform: translateY(-5px);
+
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+}
+
+/* ============================= */
+/* BUTTONS */
+/* ============================= */
+
+.stButton button {
+
+    background: linear-gradient(
+        90deg,
+        #38BDF8,
+        #A855F7
+    );
+
+    color: rgb(15, 2, 2);
+
+    border: none;
+
+    border-radius: 14px;
+
+    padding: 12px 24px;
+
+    font-weight: 600;
+
+    font-size: 15px;
+
+    transition: all 0.3s ease;
+
+    box-shadow: 0px 4px 15px rgba(56,189,248,0.3);
+}
+
+.stButton button:hover {
+
+    transform: scale(1.05);
+
+    background: linear-gradient(
+        90deg,
+        #A855F7,
+        #38BDF8
+    );
+
+    box-shadow: 0px 8px 25px rgba(168,85,247,0.5);
+}
+
+/* ============================= */
+/* INPUT BOXES */
+/* ============================= */
+
+.stTextInput input,
+.stNumberInput input,
+.stDateInput input,
+.stSelectbox div {
+
+    background: rgba(255,255,255,0.08) !important;
+
+    color: rgb(15, 15, 15) !important;
+
+    border: 1px solid rgba(255,255,255,0.15);
+
+    border-radius: 12px;
+
+    backdrop-filter: blur(10px);
+}
+
+/* ============================= */
+/* TABLE */
+/* ============================= */
+
+[data-testid="stDataFrame"] {
+
+    background: rgba(255,255,255,0.05);
+
+    border-radius: 20px;
+
+    padding: 15px;
+
+    backdrop-filter: blur(15px);
+
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* ============================= */
+/* HEADINGS */
+/* ============================= */
+
+h1 {
+
+    font-size: 42px;
+
+    font-weight: 700;
+
+    color: #111111;
+
+    text-shadow: 0px 4px 10px rgba(0,0,0,0.4);
+}
+
+h2, h3 {
+
+    color: #161616;
+}
+
+/* ============================= */
+/* SUCCESS */
+/* ============================= */
+
+.stSuccess {
+
+    background: rgba(16,185,129,0.15) !important;
+
+    border: 1px solid rgba(16,185,129,0.3);
+
+    color: #060707 !important;
+
+    border-radius: 12px;
+}
+
+/* ============================= */
+/* ERROR */
+/* ============================= */
+
+.stError {
+
+    background: rgba(239,68,68,0.15) !important;
+
+    border: 1px solid rgba(239,68,68,0.3);
+
+    color: #0c0c0c !important;
+
+    border-radius: 12px;
+}
+
+/* ============================= */
+/* PROGRESS BAR */
+/* ============================= */
+
+.stProgress > div > div > div {
+
+    background: linear-gradient(
+        90deg,
+        #080808,
+        #A855F7
+    );
+}
+
+/* ============================= */
+/* SCROLLBAR */
+/* ============================= */
+
+::-webkit-scrollbar {
+
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+
+    background: #111827;
+}
+
+::-webkit-scrollbar-thumb {
+
+    background: linear-gradient(
+        #0d0d0e,
+        #A855F7
+    );
+
+    border-radius: 10px;
+}
+
+/* ============================= */
+/* FILE UPLOADER */
+/* ============================= */
+
+[data-testid="stFileUploader"] {
+
+    background: rgba(255,255,255,0.05);
+
+    padding: 15px;
+
+    border-radius: 15px;
+
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* ============================= */
+/* SELECTBOX */
+/* ============================= */
+
+.stSelectbox {
+
+    border-radius: 12px;
+}
+
+/* ============================= */
+/* CUSTOM GLASS CONTAINER */
+/* ============================= */
+
+.glass-card {
+
+    background: rgba(255,255,255,0.08);
+
+    border-radius: 20px;
+
+    padding: 20px;
+
+    backdrop-filter: blur(15px);
+
+    border: 1px solid rgba(255,255,255,0.1);
+
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
