@@ -1,6 +1,9 @@
 import sqlite3
 
-# ---------------- DATABASE CONNECTION ----------------
+# =============================
+# DATABASE CONNECTION
+# =============================
+
 conn = sqlite3.connect(
     "expenses.db",
     check_same_thread=False
@@ -8,29 +11,52 @@ conn = sqlite3.connect(
 
 cursor = conn.cursor()
 
-# ---------------- USERS TABLE ----------------
+# =============================
+# USERS TABLE
+# =============================
+
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS users(
+
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+
     username TEXT UNIQUE,
-    password BLOB
+
+    password BLOB,
+
+    salary REAL DEFAULT 0,
+
+    monthly_budget REAL DEFAULT 0
 )
 """)
 
-# ---------------- EXPENSES TABLE ----------------
+# =============================
+# EXPENSES TABLE
+# =============================
+
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS expenses(
+
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+
     user_id INTEGER,
+
     date TEXT,
+
     category TEXT,
+
     amount REAL,
+
     description TEXT
 )
 """)
 
 conn.commit()
 
-# ---------------- FUNCTION ----------------
+# =============================
+# FUNCTION
+# =============================
+
 def get_connection():
+
     return conn, cursor

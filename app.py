@@ -19,34 +19,220 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 from database import get_connection
-from auth import authentication_page
-# ---------------- PAGE CONFIG ----------------
+from auth import register_user, login_user
+
+# =============================
+# PAGE CONFIG
+# =============================
+
 st.set_page_config(
-    page_title="Expense Tracker",
+    page_title="Smart Expense Tracker",
     page_icon="💰",
     layout="wide"
 )
 
-# ---------------- DATABASE ----------------
+# =============================
+# DATABASE
+# =============================
+
 conn, cursor = get_connection()
 
-# ---------------- TITLE ----------------
-st.title("💰 Advanced Expense Tracker")
-
-# ---------------- AUTH ----------------
-authentication_page()
+# =============================
+# SESSION STATES
+# =============================
 
 if "logged_in" not in st.session_state:
 
-    st.warning("Please Login First")
+    st.session_state.logged_in = False
+
+# =============================
+# LOGIN / REGISTER PAGE
+# =============================
+
+if not st.session_state.logged_in:
+
+    st.markdown(
+        """
+        <h1 style='text-align:center;'>
+        💰 Smart Expense Tracker
+        </h1>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown("##")
+
+    col1, col2 = st.columns(2)
+
+    # =============================
+    # LOGIN
+    # =============================
+
+    with col1:
+
+        st.subheader("🔑 Login")
+
+        login_username = st.text_input(
+            "Username"
+        )
+
+        login_password = st.text_input(
+            "Password",
+            type="password"
+        )
+
+        if st.button("Login"):
+
+            user = login_user(
+                login_username,
+                login_password
+            )
+
+            if user:
+
+                st.session_state.logged_in = True
+                st.session_state.user_id = user[0]
+                st.session_state.username = user[1]
+
+                st.success(
+                    "Login Successful!"
+                )
+
+                st.rerun()
+
+            else:
+
+                st.error(
+                    "Invalid Username or Password"
+                )
+
+    # =============================
+    # REGISTER
+    # =============================
+
+    with col2:
+
+        st.subheader("📝 Register")
+
+        new_username = st.text_input(
+            "Create Username"
+        )
+
+        new_password = st.text_input(
+            "Create Password",
+            type="password"
+        )
+
+        if st.button("Register"):
+
+            success = register_user(
+                new_username,
+                new_password
+            )
+
+            if success:
+
+                st.success(
+                    "Account Created Successfully!"
+                )
+
+            else:
+
+                st.error(
+                    "Username Already Exists"
+                )
+
     st.stop()
 
-# ---------------- SIDEBAR ----------------
-st.sidebar.title("➕ Add New Expense")
+# =============================
+# DASHBOARD
+# =============================
 
-expense_date = st.sidebar.date_input("Date")
+st.title(
+    f"💰 Welcome {st.session_state.username}"
+)
 
-category = st.sidebar.selectbox(
+# =============================
+# LOGOUT
+# =============================
+
+if st.button("Logout"):
+
+    st.session_state.logged_in = False
+
+    st.rerun()
+
+# =============================
+# LOAD USER FINANCIAL DATA
+# =============================
+
+cursor.execute("""
+SELECT salary, monthly_budget
+FROM users
+WHERE id = ?
+""", (st.session_state.user_id,))
+
+user_finance = cursor.fetchone()
+
+saved_salary = user_finance[0]
+saved_budget = user_finance[1]
+
+# =============================
+# FINANCIAL SETTINGS
+# =============================
+
+st.subheader("💵 Monthly Planning")
+
+col1, col2 = st.columns(2)
+
+salary = col1.number_input(
+    "Enter Monthly Salary",
+    min_value=0.0,
+    value=float(saved_salary),
+    step=1000.0
+)
+
+monthly_budget = col2.number_input(
+    "Enter Monthly Budget",
+    min_value=0.0,
+    value=float(saved_budget),
+    step=1000.0
+)
+
+if st.button("Save Financial Settings"):
+
+    cursor.execute("""
+    UPDATE users
+    SET salary = ?,
+        monthly_budget = ?
+    WHERE id = ?
+    """, (
+        salary,
+        monthly_budget,
+        st.session_state.user_id
+    ))
+
+    conn.commit()
+
+    st.success(
+        "Financial Settings Saved!"
+    )
+
+    st.rerun()
+
+# =============================
+# ADD EXPENSE
+# =============================
+
+st.subheader("➕ Add Expense")
+
+col1, col2, col3 = st.columns(3)
+
+expense_date = col1.date_input(
+    "Date"
+)
+
+category = col2.selectbox(
     "Category",
     [
         "Food",
@@ -60,18 +246,17 @@ category = st.sidebar.selectbox(
     ]
 )
 
-amount = st.sidebar.number_input(
+amount = col3.number_input(
     "Amount",
     min_value=0.0,
     step=1.0
 )
 
-description = st.sidebar.text_input(
+description = st.text_input(
     "Description"
 )
 
-# ---------------- SAVE EXPENSE ----------------
-if st.sidebar.button("Save Expense"):
+if st.button("Save Expense"):
 
     cursor.execute("""
     INSERT INTO expenses(
@@ -83,7 +268,7 @@ if st.sidebar.button("Save Expense"):
     )
     VALUES (?, ?, ?, ?, ?)
     """, (
-        st.session_state["user_id"],
+        st.session_state.user_id,
         str(expense_date),
         category,
         amount,
@@ -92,93 +277,123 @@ if st.sidebar.button("Save Expense"):
 
     conn.commit()
 
-    st.sidebar.success(
+    st.success(
         "Expense Added Successfully!"
     )
 
-# ---------------- LOAD DATA ----------------
+    st.rerun()
+
+# =============================
+# LOAD USER DATA
+# =============================
+
 query = f"""
 SELECT * FROM expenses
-WHERE user_id = {st.session_state["user_id"]}
+WHERE user_id = {st.session_state.user_id}
 """
 
-df = pd.read_sql_query(query, conn)
+df = pd.read_sql_query(
+    query,
+    conn
+)
 
-# ---------------- DASHBOARD METRICS ----------------
+# =============================
+# AUTO EXPORT EXCEL
+# =============================
+
+if not df.empty:
+
+    df.to_excel(
+        "expenses.xlsx",
+        index=False,
+        engine="openpyxl"
+    )
+
+# =============================
+# CALCULATIONS
+# =============================
+
 total_expense = 0
 
 if not df.empty:
 
     total_expense = df["amount"].sum()
 
-total_transactions = len(df)
+remaining_budget = monthly_budget - total_expense
+
+savings = salary - total_expense
 
 average_expense = 0
 
-if total_transactions > 0:
+if len(df) > 0:
 
-    average_expense = total_expense / total_transactions
+    average_expense = total_expense / len(df)
 
-# ---------------- METRICS ----------------
-col1, col2, col3 = st.columns(3)
+# =============================
+# METRICS
+# =============================
+
+st.subheader("📊 Financial Overview")
+
+col1, col2, col3, col4 = st.columns(4)
 
 col1.metric(
-    "💵 Total Expenses",
-    f"₹ {round(total_expense, 2)}"
+    "💵 Total Expense",
+    f"₹ {round(total_expense,2)}"
 )
 
 col2.metric(
-    "📌 Transactions",
-    total_transactions
+    "💰 Remaining Budget",
+    f"₹ {round(remaining_budget,2)}"
 )
 
 col3.metric(
-    "📈 Average Expense",
-    f"₹ {round(average_expense, 2)}"
+    "🏦 Savings",
+    f"₹ {round(savings,2)}"
 )
 
-# ---------------- BUDGET ALERT ----------------
-monthly_budget = 10000
+col4.metric(
+    "📈 Average Expense",
+    f"₹ {round(average_expense,2)}"
+)
 
-progress = min(total_expense / monthly_budget, 1.0)
+# =============================
+# BUDGET ALERT
+# =============================
 
-st.subheader("💳 Monthly Budget")
+progress = 0
+
+if monthly_budget > 0:
+
+    progress = min(
+        total_expense / monthly_budget,
+        1.0
+    )
 
 st.progress(progress)
 
 if total_expense > monthly_budget:
 
-    st.error("⚠ Budget Limit Exceeded!")
+    st.error(
+        "⚠ Budget Limit Exceeded!"
+    )
 
 else:
 
-    st.success("✅ Budget Under Control")
+    st.success(
+        "✅ Budget Under Control"
+    )
 
-# ---------------- FILTERS ----------------
-st.subheader("🔍 Filters")
+# =============================
+# SEARCH
+# =============================
 
-col1, col2 = st.columns(2)
+st.subheader("🔍 Search Expenses")
 
-search = col1.text_input(
-    "Search Category"
+search = st.text_input(
+    "Search By Category"
 )
 
-selected_category = col2.selectbox(
-    "Filter Category",
-    [
-        "All",
-        "Food",
-        "Travel",
-        "Shopping",
-        "Bills",
-        "Entertainment",
-        "Health",
-        "Education",
-        "Other"
-    ]
-)
-
-# ---------------- APPLY FILTERS ----------------
 filtered_df = df.copy()
 
 if search != "":
@@ -190,13 +405,10 @@ if search != "":
         )
     ]
 
-if selected_category != "All":
+# =============================
+# SHOW TABLE
+# =============================
 
-    filtered_df = filtered_df[
-        filtered_df["category"] == selected_category
-    ]
-
-# ---------------- SHOW TABLE ----------------
 st.subheader("📋 Expense Records")
 
 st.dataframe(
@@ -204,7 +416,10 @@ st.dataframe(
     use_container_width=True
 )
 
-# ---------------- DELETE EXPENSE ----------------
+# =============================
+# DELETE EXPENSE
+# =============================
+
 st.subheader("🗑 Delete Expense")
 
 if not filtered_df.empty:
@@ -212,7 +427,7 @@ if not filtered_df.empty:
     expense_ids = filtered_df["id"].tolist()
 
     selected_id = st.selectbox(
-        "Select Expense ID To Delete",
+        "Select Expense ID",
         expense_ids
     )
 
@@ -231,7 +446,10 @@ if not filtered_df.empty:
 
         st.rerun()
 
-# ---------------- EDIT EXPENSE ----------------
+# =============================
+# EDIT EXPENSE
+# =============================
+
 st.subheader("✏ Edit Expense")
 
 if not filtered_df.empty:
@@ -292,16 +510,18 @@ if not filtered_df.empty:
 
         st.rerun()
 
-# ---------------- CHARTS ----------------
+# =============================
+# CHARTS
+# =============================
+
 if not filtered_df.empty:
 
-    st.subheader("📊 Expense Analytics")
+    st.subheader("📈 Expense Analytics")
 
     category_data = filtered_df.groupby(
         "category"
     )["amount"].sum().reset_index()
 
-    # ---------------- PIE CHART ----------------
     pie_chart = px.pie(
         category_data,
         names="category",
@@ -315,7 +535,6 @@ if not filtered_df.empty:
         use_container_width=True
     )
 
-    # ---------------- BAR CHART ----------------
     bar_chart = px.bar(
         category_data,
         x="category",
@@ -329,7 +548,6 @@ if not filtered_df.empty:
         use_container_width=True
     )
 
-    # ---------------- LINE CHART ----------------
     filtered_df["date"] = pd.to_datetime(
         filtered_df["date"]
     )
@@ -351,53 +569,36 @@ if not filtered_df.empty:
         use_container_width=True
     )
 
-# ---------------- CSV UPLOAD ----------------
-st.subheader("📂 Upload CSV")
+# =============================
+# DOWNLOAD EXCEL
+# =============================
 
-uploaded_file = st.file_uploader(
-    "Upload CSV File",
-    type=["csv"]
-)
+st.subheader("📥 Download Excel Report")
 
-if uploaded_file is not None:
+if not df.empty:
 
-    upload_df = pd.read_csv(
-        uploaded_file
-    )
-
-    st.dataframe(
-        upload_df,
-        use_container_width=True
-    )
-
-# ---------------- EXPORT ----------------
-st.subheader("📥 Export Data")
-
-if st.button("Export To Excel"):
-
-    file_name = f"expense_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-
-    filtered_df.to_excel(
-        file_name,
-        index=False,
-        engine="openpyxl"
-    )
-
-    with open(file_name, "rb") as file:
+    with open("expenses.xlsx", "rb") as file:
 
         st.download_button(
             label="⬇ Download Excel File",
             data=file,
-            file_name=file_name,
+            file_name="expenses.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-# ---------------- FOOTER ----------------
+# =============================
+# FOOTER
+# =============================
+
 st.markdown("---")
 
 st.markdown(
-    f"""
-### 👤 Logged In User:
-**{st.session_state["username"]}**
-"""
+    """
+    <center>
+    <h4>
+    Developed with ❤️ using Streamlit
+    </h4>
+    </center>
+    """,
+    unsafe_allow_html=True
 )

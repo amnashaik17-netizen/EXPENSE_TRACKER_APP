@@ -1,10 +1,12 @@
-import streamlit as st
 import bcrypt
 from database import get_connection
 
 conn, cursor = get_connection()
 
-# ---------------- HASH PASSWORD ----------------
+# =============================
+# HASH PASSWORD
+# =============================
+
 def hash_password(password):
 
     return bcrypt.hashpw(
@@ -12,7 +14,10 @@ def hash_password(password):
         bcrypt.gensalt()
     )
 
-# ---------------- VERIFY PASSWORD ----------------
+# =============================
+# VERIFY PASSWORD
+# =============================
+
 def verify_password(password, hashed_password):
 
     return bcrypt.checkpw(
@@ -20,7 +25,10 @@ def verify_password(password, hashed_password):
         hashed_password
     )
 
-# ---------------- REGISTER USER ----------------
+# =============================
+# REGISTER USER
+# =============================
+
 def register_user(username, password):
 
     hashed_password = hash_password(password)
@@ -28,7 +36,10 @@ def register_user(username, password):
     try:
 
         cursor.execute("""
-        INSERT INTO users(username, password)
+        INSERT INTO users(
+            username,
+            password
+        )
         VALUES (?, ?)
         """, (
             username,
@@ -43,11 +54,15 @@ def register_user(username, password):
 
         return False
 
-# ---------------- LOGIN USER ----------------
+# =============================
+# LOGIN USER
+# =============================
+
 def login_user(username, password):
 
     cursor.execute("""
-    SELECT * FROM users
+    SELECT *
+    FROM users
     WHERE username = ?
     """, (username,))
 
@@ -57,86 +72,11 @@ def login_user(username, password):
 
         stored_password = user[2]
 
-        if verify_password(password, stored_password):
+        if verify_password(
+            password,
+            stored_password
+        ):
 
             return user
 
     return None
-
-# ---------------- AUTH PAGE ----------------
-def authentication_page():
-
-    st.sidebar.title("🔐 Authentication")
-
-    menu = st.sidebar.selectbox(
-        "Select Option",
-        ["Login", "Register"]
-    )
-
-    # ---------------- REGISTER ----------------
-    if menu == "Register":
-
-        st.subheader("📝 Create Account")
-
-        new_user = st.text_input("Username")
-
-        new_password = st.text_input(
-            "Password",
-            type="password"
-        )
-
-        if st.button("Register"):
-
-            if new_user == "" or new_password == "":
-
-                st.warning("Please Fill All Fields")
-
-            else:
-
-                success = register_user(
-                    new_user,
-                    new_password
-                )
-
-                if success:
-
-                    st.success("Account Created Successfully!")
-
-                else:
-
-                    st.error("Username Already Exists")
-
-    # ---------------- LOGIN ----------------
-    elif menu == "Login":
-
-        st.subheader("🔑 Login")
-
-        username = st.text_input("Username")
-
-        password = st.text_input(
-            "Password",
-            type="password"
-        )
-
-        if st.button("Login"):
-
-            user = login_user(
-                username,
-                password
-            )
-
-            if user:
-
-                st.session_state["logged_in"] = True
-                st.session_state["user_id"] = user[0]
-                st.session_state["username"] = user[1]
-
-                st.success(
-                    f"Welcome {user[1]}"
-                )
-
-            else:
-
-                st.error(
-                    "Invalid Username or Password"
-                )
