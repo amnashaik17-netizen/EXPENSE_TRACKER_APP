@@ -1,604 +1,276 @@
 import streamlit as st
-
-# =============================
-# LOAD CSS
-# =============================
-
-def load_css():
-
-    with open("assets/style.css") as f:
-
-        st.markdown(
-            f"<style>{f.read()}</style>",
-            unsafe_allow_html=True
-        )
-
-load_css()
-
+import sqlite3
 import pandas as pd
-import plotly.express as px
 from datetime import datetime
-from database import get_connection
-from auth import register_user, login_user
 
-# =============================
-# PAGE CONFIG
-# =============================
+# =========================
+# DATABASE CONNECTION
+# =========================
 
-st.set_page_config(
-    page_title="Smart Expense Tracker",
-    page_icon="💰",
-    layout="wide"
-)
+conn = sqlite3.connect("expense_tracker.db", check_same_thread=False)
+cursor = conn.cursor()
 
-# =============================
-# DATABASE
-# =============================
-
-conn, cursor = get_connection()
-
-# =============================
-# SESSION STATES
-# =============================
-
-if "logged_in" not in st.session_state:
-
-    st.session_state.logged_in = False
-
-# =============================
-# LOGIN / REGISTER PAGE
-# =============================
-
-if not st.session_state.logged_in:
-
-    st.markdown(
-        """
-        <h1 style='text-align:center;'>
-        💰 Smart Expense Tracker
-        </h1>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.markdown("##")
-
-    col1, col2 = st.columns(2)
-
-    # =============================
-    # LOGIN
-    # =============================
-
-    with col1:
-
-        st.subheader("🔑 Login")
-
-        login_username = st.text_input(
-            "Username"
-        )
-
-        login_password = st.text_input(
-            "Password",
-            type="password"
-        )
-
-        if st.button("Login"):
-
-            user = login_user(
-                login_username,
-                login_password
-            )
-
-            if user:
-
-                st.session_state.logged_in = True
-                st.session_state.user_id = user[0]
-                st.session_state.username = user[1]
-
-                st.success(
-                    "Login Successful!"
-                )
-
-                st.rerun()
-
-            else:
-
-                st.error(
-                    "Invalid Username or Password"
-                )
-
-    # =============================
-    # REGISTER
-    # =============================
-
-    with col2:
-
-        st.subheader("📝 Register")
-
-        new_username = st.text_input(
-            "Create Username"
-        )
-
-        new_password = st.text_input(
-            "Create Password",
-            type="password"
-        )
-
-        if st.button("Register"):
-
-            success = register_user(
-                new_username,
-                new_password
-            )
-
-            if success:
-
-                st.success(
-                    "Account Created Successfully!"
-                )
-
-            else:
-
-                st.error(
-                    "Username Already Exists"
-                )
-
-    st.stop()
-
-# =============================
-# DASHBOARD
-# =============================
-
-st.title(
-    f"💰 Welcome {st.session_state.username}"
-)
-
-# =============================
-# LOGOUT
-# =============================
-
-if st.button("Logout"):
-
-    st.session_state.logged_in = False
-
-    st.rerun()
-
-# =============================
-# LOAD USER FINANCIAL DATA
-# =============================
+# =========================
+# CREATE USERS TABLE
+# =========================
 
 cursor.execute("""
-SELECT salary, monthly_budget
-FROM users
-WHERE id = ?
-""", (st.session_state.user_id,))
-
-user_finance = cursor.fetchone()
-
-saved_salary = user_finance[0]
-saved_budget = user_finance[1]
-
-# =============================
-# FINANCIAL SETTINGS
-# =============================
-
-st.subheader("💵 Monthly Planning")
-
-col1, col2 = st.columns(2)
-
-salary = col1.number_input(
-    "Enter Monthly Salary",
-    min_value=0.0,
-    value=float(saved_salary),
-    step=1000.0
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    password TEXT,
+    salary REAL DEFAULT 0,
+    monthly_budget REAL DEFAULT 0
 )
+""")
 
-monthly_budget = col2.number_input(
-    "Enter Monthly Budget",
-    min_value=0.0,
-    value=float(saved_budget),
-    step=1000.0
+# =========================
+# ADD MISSING COLUMNS SAFELY
+# =========================
+
+try:
+    cursor.execute("ALTER TABLE users ADD COLUMN salary REAL DEFAULT 0")
+except:
+    pass
+
+try:
+    cursor.execute("ALTER TABLE users ADD COLUMN monthly_budget REAL DEFAULT 0")
+except:
+    pass
+
+# =========================
+# CREATE EXPENSE TABLE
+# =========================
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    title TEXT,
+    amount REAL,
+    category TEXT,
+    expense_date TEXT
 )
+""")
 
-if st.button("Save Financial Settings"):
+conn.commit()
 
-    cursor.execute("""
-    UPDATE users
-    SET salary = ?,
-        monthly_budget = ?
-    WHERE id = ?
-    """, (
-        salary,
-        monthly_budget,
-        st.session_state.user_id
-    ))
+# =========================
+# SESSION STATE
+# =========================
 
-    conn.commit()
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-    st.success(
-        "Financial Settings Saved!"
-    )
+if "user_id" not in st.session_state:
+    st.session_state.user_id = None
 
-    st.rerun()
+# =========================
+# REGISTER FUNCTION
+# =========================
 
-# =============================
-# ADD EXPENSE
-# =============================
-
-st.subheader("➕ Add Expense")
-
-col1, col2, col3 = st.columns(3)
-
-expense_date = col1.date_input(
-    "Date"
-)
-
-category = col2.selectbox(
-    "Category",
-    [
-        "Food",
-        "Travel",
-        "Shopping",
-        "Bills",
-        "Entertainment",
-        "Health",
-        "Education",
-        "Other"
-    ]
-)
-
-amount = col3.number_input(
-    "Amount",
-    min_value=0.0,
-    step=1.0
-)
-
-description = st.text_input(
-    "Description"
-)
-
-if st.button("Save Expense"):
-
-    cursor.execute("""
-    INSERT INTO expenses(
-        user_id,
-        date,
-        category,
-        amount,
-        description
-    )
-    VALUES (?, ?, ?, ?, ?)
-    """, (
-        st.session_state.user_id,
-        str(expense_date),
-        category,
-        amount,
-        description
-    ))
-
-    conn.commit()
-
-    st.success(
-        "Expense Added Successfully!"
-    )
-
-    st.rerun()
-
-# =============================
-# LOAD USER DATA
-# =============================
-
-query = f"""
-SELECT * FROM expenses
-WHERE user_id = {st.session_state.user_id}
-"""
-
-df = pd.read_sql_query(
-    query,
-    conn
-)
-
-# =============================
-# AUTO EXPORT EXCEL
-# =============================
-
-if not df.empty:
-
-    df.to_excel(
-        "expenses.xlsx",
-        index=False,
-        engine="openpyxl"
-    )
-
-# =============================
-# CALCULATIONS
-# =============================
-
-total_expense = 0
-
-if not df.empty:
-
-    total_expense = df["amount"].sum()
-
-remaining_budget = monthly_budget - total_expense
-
-savings = salary - total_expense
-
-average_expense = 0
-
-if len(df) > 0:
-
-    average_expense = total_expense / len(df)
-
-# =============================
-# METRICS
-# =============================
-
-st.subheader("📊 Financial Overview")
-
-col1, col2, col3, col4 = st.columns(4)
-
-col1.metric(
-    "💵 Total Expense",
-    f"₹ {round(total_expense,2)}"
-)
-
-col2.metric(
-    "💰 Remaining Budget",
-    f"₹ {round(remaining_budget,2)}"
-)
-
-col3.metric(
-    "🏦 Savings",
-    f"₹ {round(savings,2)}"
-)
-
-col4.metric(
-    "📈 Average Expense",
-    f"₹ {round(average_expense,2)}"
-)
-
-# =============================
-# BUDGET ALERT
-# =============================
-
-progress = 0
-
-if monthly_budget > 0:
-
-    progress = min(
-        total_expense / monthly_budget,
-        1.0
-    )
-
-st.progress(progress)
-
-if total_expense > monthly_budget:
-
-    st.error(
-        "⚠ Budget Limit Exceeded!"
-    )
-
-else:
-
-    st.success(
-        "✅ Budget Under Control"
-    )
-
-# =============================
-# SEARCH
-# =============================
-
-st.subheader("🔍 Search Expenses")
-
-search = st.text_input(
-    "Search By Category"
-)
-
-filtered_df = df.copy()
-
-if search != "":
-
-    filtered_df = filtered_df[
-        filtered_df["category"].str.contains(
-            search,
-            case=False
+def register(username, password):
+    try:
+        cursor.execute(
+            "INSERT INTO users (username, password) VALUES (?, ?)",
+            (username, password)
         )
-    ]
-
-# =============================
-# SHOW TABLE
-# =============================
-
-st.subheader("📋 Expense Records")
-
-st.dataframe(
-    filtered_df,
-    use_container_width=True
-)
-
-# =============================
-# DELETE EXPENSE
-# =============================
-
-st.subheader("🗑 Delete Expense")
-
-if not filtered_df.empty:
-
-    expense_ids = filtered_df["id"].tolist()
-
-    selected_id = st.selectbox(
-        "Select Expense ID",
-        expense_ids
-    )
-
-    if st.button("Delete Expense"):
-
-        cursor.execute("""
-        DELETE FROM expenses
-        WHERE id = ?
-        """, (selected_id,))
-
         conn.commit()
+        return True
+    except:
+        return False
 
-        st.success(
-            "Expense Deleted Successfully!"
-        )
+# =========================
+# LOGIN FUNCTION
+# =========================
 
+def login(username, password):
+    cursor.execute(
+        "SELECT id FROM users WHERE username=? AND password=?",
+        (username, password)
+    )
+
+    user = cursor.fetchone()
+
+    if user:
+        st.session_state.logged_in = True
+        st.session_state.user_id = user[0]
+        return True
+
+    return False
+
+# =========================
+# SIDEBAR
+# =========================
+
+st.sidebar.title("Smart Expense Tracker")
+
+menu = st.sidebar.selectbox(
+    "Menu",
+    ["Login", "Register"] if not st.session_state.logged_in else ["Dashboard"]
+)
+
+# =========================
+# REGISTER PAGE
+# =========================
+
+if menu == "Register":
+
+    st.title("Register")
+
+    new_user = st.text_input("Username")
+    new_pass = st.text_input("Password", type="password")
+
+    if st.button("Register"):
+
+        if register(new_user, new_pass):
+            st.success("Registration Successful")
+        else:
+            st.error("Username already exists")
+
+# =========================
+# LOGIN PAGE
+# =========================
+
+elif menu == "Login":
+
+    st.title("Login")
+
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+
+        if login(username, password):
+            st.success("Login Successful")
+            st.rerun()
+        else:
+            st.error("Invalid Username or Password")
+
+# =========================
+# DASHBOARD
+# =========================
+
+elif menu == "Dashboard":
+
+    st.title("Expense Tracker Dashboard")
+
+    # LOGOUT
+    if st.button("Logout"):
+        st.session_state.logged_in = False
+        st.session_state.user_id = None
         st.rerun()
 
-# =============================
-# EDIT EXPENSE
-# =============================
+    # =========================
+    # GET USER DATA
+    # =========================
 
-st.subheader("✏ Edit Expense")
+    cursor.execute("""
+    SELECT salary, monthly_budget
+    FROM users
+    WHERE id = ?
+    """, (st.session_state.user_id,))
 
-if not filtered_df.empty:
+    user_data = cursor.fetchone()
 
-    edit_id = st.selectbox(
-        "Select Expense ID To Edit",
-        expense_ids
+    salary = user_data[0]
+    monthly_budget = user_data[1]
+
+    st.subheader("Monthly Settings")
+
+    new_salary = st.number_input(
+        "Enter Monthly Salary",
+        value=float(salary)
     )
 
-    selected_row = filtered_df[
-        filtered_df["id"] == edit_id
-    ].iloc[0]
-
-    new_category = st.selectbox(
-        "New Category",
-        [
-            "Food",
-            "Travel",
-            "Shopping",
-            "Bills",
-            "Entertainment",
-            "Health",
-            "Education",
-            "Other"
-        ]
+    new_budget = st.number_input(
+        "Enter Monthly Budget",
+        value=float(monthly_budget)
     )
 
-    new_amount = st.number_input(
-        "New Amount",
-        value=float(selected_row["amount"])
-    )
-
-    new_description = st.text_input(
-        "New Description",
-        value=selected_row["description"]
-    )
-
-    if st.button("Update Expense"):
+    if st.button("Save Settings"):
 
         cursor.execute("""
-        UPDATE expenses
-        SET category = ?,
-            amount = ?,
-            description = ?
-        WHERE id = ?
+        UPDATE users
+        SET salary=?, monthly_budget=?
+        WHERE id=?
         """, (
-            new_category,
-            new_amount,
-            new_description,
-            edit_id
+            new_salary,
+            new_budget,
+            st.session_state.user_id
         ))
 
         conn.commit()
 
-        st.success(
-            "Expense Updated Successfully!"
+        st.success("Settings Saved")
+
+    # =========================
+    # ADD EXPENSE
+    # =========================
+
+    st.subheader("Add Expense")
+
+    title = st.text_input("Expense Title")
+    amount = st.number_input("Amount", min_value=0.0)
+    category = st.selectbox(
+        "Category",
+        ["Food", "Travel", "Shopping", "Bills", "Other"]
+    )
+
+    if st.button("Add Expense"):
+
+        cursor.execute("""
+        INSERT INTO expenses (
+            user_id,
+            title,
+            amount,
+            category,
+            expense_date
+        )
+        VALUES (?, ?, ?, ?, ?)
+        """, (
+            st.session_state.user_id,
+            title,
+            amount,
+            category,
+            datetime.now().strftime("%Y-%m-%d")
+        ))
+
+        conn.commit()
+
+        st.success("Expense Added")
+
+    # =========================
+    # SHOW EXPENSES
+    # =========================
+
+    st.subheader("Expense History")
+
+    cursor.execute("""
+    SELECT title, amount, category, expense_date
+    FROM expenses
+    WHERE user_id=?
+    ORDER BY id DESC
+    """, (st.session_state.user_id,))
+
+    data = cursor.fetchall()
+
+    if data:
+
+        df = pd.DataFrame(
+            data,
+            columns=["Title", "Amount", "Category", "Date"]
         )
 
-        st.rerun()
+        st.dataframe(df)
 
-# =============================
-# CHARTS
-# =============================
+        total_expense = df["Amount"].sum()
 
-if not filtered_df.empty:
+        st.metric("Total Expense", f"₹{total_expense}")
 
-    st.subheader("📈 Expense Analytics")
+        remaining = monthly_budget - total_expense
 
-    category_data = filtered_df.groupby(
-        "category"
-    )["amount"].sum().reset_index()
+        st.metric("Remaining Budget", f"₹{remaining}")
 
-    pie_chart = px.pie(
-        category_data,
-        names="category",
-        values="amount",
-        hole=0.4,
-        title="Category Distribution"
-    )
-
-    st.plotly_chart(
-        pie_chart,
-        use_container_width=True
-    )
-
-    bar_chart = px.bar(
-        category_data,
-        x="category",
-        y="amount",
-        color="category",
-        title="Expenses By Category"
-    )
-
-    st.plotly_chart(
-        bar_chart,
-        use_container_width=True
-    )
-
-    filtered_df["date"] = pd.to_datetime(
-        filtered_df["date"]
-    )
-
-    daily_data = filtered_df.groupby(
-        "date"
-    )["amount"].sum().reset_index()
-
-    line_chart = px.line(
-        daily_data,
-        x="date",
-        y="amount",
-        markers=True,
-        title="Daily Expense Trend"
-    )
-
-    st.plotly_chart(
-        line_chart,
-        use_container_width=True
-    )
-
-# =============================
-# DOWNLOAD EXCEL
-# =============================
-
-st.subheader("📥 Download Excel Report")
-
-if not df.empty:
-
-    with open("expenses.xlsx", "rb") as file:
-
-        st.download_button(
-            label="⬇ Download Excel File",
-            data=file,
-            file_name="expenses.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
-# =============================
-# FOOTER
-# =============================
-
-st.markdown("---")
-
-st.markdown(
-    """
-    <center>
-    <h4>
-    Developed with ❤️ using Streamlit
-    </h4>
-    </center>
-    """,
-    unsafe_allow_html=True
-)
+    else:
+        st.info("No expenses added yet")
